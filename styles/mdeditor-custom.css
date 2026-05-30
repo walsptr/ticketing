@@ -1,0 +1,27 @@
+/* mdeditor-custom.css */
+.wmde-markdown-var,
+.w-md-editor-toolbar button {
+  font-size: 12px !important;   /* Atur ukuran icon */
+  padding: 8px 10px !important; 
+  line-height: 1;
+}
+
+.w-md-editor-toolbar svg {
+  width: 12px !important;
+  height: 14px !important;
+}
+
+.w-md-editor-toolbar {
+  gap: 5px; /* spasi antar tombol */
+}
+
+.w-md-editor-toolbar button:hover {
+  background-color: rgba(0, 0, 0, 0.05); /* hover ringan */
+}
+
+/* Besarkan tombol tombol lainnya sedikit saja */
+.w-md-editor-toolbar li > button {
+  padding: 4px !important;
+}
+
+

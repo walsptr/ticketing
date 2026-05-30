@@ -1,0 +1,35 @@
+{
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "rules": {
+    "@next/next/no-img-element": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "no-unused-vars": [
+      "error",
+      {
+        "varsIgnorePattern": "^_",
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "varsIgnorePattern": "^_",
+        "argsIgnorePattern": "^_"
+      }
+    ]
+  }
+
+  // "parserOptions": {
+  //   "sourceType": "module",
+  //   "ecmaVersion": 2024
+  // }
+
+  // "overrides": [
+  //   {
+  //     "files": ["*.js", "*.jsx", "*.ts", "*.tsx"],
+  //     "linterOptions": {
+  //       "reportUnusedDisableDirectives": true
+  //     }
+  //   }
+  // ]
+}
