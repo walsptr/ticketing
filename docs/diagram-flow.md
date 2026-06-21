@@ -132,3 +132,39 @@ flowchart TD
     H -- Tidak --> F
     H -- Ya --> I[Tiket selesai]
 ```
+
+## 8. Flow Existing Handover Manual
+
+Bagian ini menggambarkan kondisi bisnis sebelum menggunakan aplikasi ticketing, ketika proses handover antar shift masih mengandalkan komunikasi verbal.
+
+```mermaid
+flowchart TD
+    A[Engineer Shift 1 mengerjakan sebagian pekerjaan] --> B[Hasil pekerjaan belum terdokumentasi terstruktur]
+    B --> C[Handover dilakukan secara verbal]
+    C --> D[Engineer Shift 2 menerima informasi secara lisan]
+    D --> E{Informasi lengkap dan konsisten?}
+    E -- Tidak --> F[Detail pekerjaan, kendala, dan progres tidak lengkap]
+    F --> G[Engineer Shift 2 mengulang analisis atau pekerjaan]
+    G --> H[Waktu penanganan bertambah]
+    H --> I[Efisiensi kerja menurun]
+    E -- Ya --> J[Pekerjaan dapat dilanjutkan]
+```
+
+## 9. Flow Solusi Menggunakan Aplikasi Ticketing
+
+Bagian ini menggambarkan kondisi bisnis setelah proses handover dibantu aplikasi ticketing sehingga informasi kerja tercatat dan dapat ditelusuri antar shift.
+
+```mermaid
+flowchart TD
+    A[Engineer Shift 1 mengerjakan tiket] --> B[Engineer Shift 1 mencatat progres, kendala, dan next action pada tiket]
+    B --> C[Tiket disimpan pada project dan phase yang sesuai]
+    C --> D[Reply atau histori aktivitas tersimpan pada sistem]
+    D --> E[Engineer Shift 2 membuka tiket yang sama]
+    E --> F[Engineer Shift 2 membaca status terakhir, catatan, dan histori handover]
+    F --> G{Informasi kerja sudah lengkap?}
+    G -- Ya --> H[Pekerjaan dilanjutkan dari progres terakhir]
+    H --> I[Pengulangan pekerjaan berkurang]
+    I --> J[Continuity antar shift meningkat]
+    G -- Tidak --> K[Engineer Shift 2 menambahkan pembaruan lanjutan pada tiket]
+    K --> H
+```

@@ -280,6 +280,36 @@ Mengelola pekerjaan berbasis project dan ticket.
 
 - pekerjaan proyek dapat dipantau secara terstruktur.
 
+### Perbandingan Kondisi Existing dan Solusi Aplikasi
+
+#### Kondisi Existing
+
+Pada proses existing, handover antar engineer masih banyak dilakukan secara verbal. Pola ini menimbulkan beberapa risiko bisnis:
+
+- progres pekerjaan tidak selalu tercatat secara konsisten,
+- detail kendala dan langkah berikutnya bisa tidak tersampaikan penuh,
+- engineer shift berikutnya harus mengulang analisis untuk memahami kondisi terakhir,
+- durasi penanganan menjadi lebih panjang karena terjadi pengulangan pekerjaan.
+
+#### Kondisi Setelah Menggunakan Aplikasi
+
+Dengan aplikasi ticketing, proses handover menjadi lebih terstruktur karena informasi kerja dicatat pada tiket yang sama. Mekanisme bisnis yang diharapkan adalah:
+
+- engineer shift 1 mencatat progres, kendala, status, dan rencana tindak lanjut pada tiket,
+- tiket ditempatkan pada project dan phase yang sesuai agar posisi pekerjaan jelas,
+- histori reply dan pembaruan aktivitas dapat dibaca oleh engineer shift berikutnya,
+- engineer shift 2 dapat langsung melanjutkan pekerjaan dari status terakhir tanpa memulai ulang dari awal.
+
+#### Dampak Bisnis
+
+Penerapan aplikasi diharapkan memberikan dampak sebagai berikut:
+
+- mengurangi ketergantungan pada handover verbal,
+- meningkatkan kelengkapan informasi antar shift,
+- menurunkan risiko miskomunikasi,
+- mengurangi pengulangan pekerjaan,
+- meningkatkan continuity dan efisiensi operasional.
+
 ## 11. Rekomendasi Pengembangan Lanjutan
 
 Untuk menyempurnakan SOP bisnis, tahap pengembangan berikut dianjurkan:
