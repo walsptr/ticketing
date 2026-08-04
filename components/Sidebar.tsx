@@ -26,6 +26,9 @@ interface MenuRoleMap {
 const menusBasedRole: MenuRoleMap = {
   admin: [
     { name: "Dashboard", url: "/dashboard", icon: <LayoutDashboard /> },
+    { name: "Manage Project", url: "/manage-project", icon: <Ticket /> },
+    { name: "My Ticket", url: "/ticket", icon: <Ticket /> },
+    { name: "Manage Phases", url: "/ticket/phases", icon: <Ticket /> },
     {
       name: "Manage Users",
       url: "/manage-user",
@@ -48,11 +51,14 @@ const menusBasedRole: MenuRoleMap = {
   ],
   consultant: [
     { name: "Dashboard", url: "/dashboard", icon: <LayoutDashboard /> },
+    { name: "Manage Project", url: "/manage-project", icon: <Ticket /> },
     { name: "My Ticket", url: "/ticket", icon: <Ticket /> },
   ],
   "project coordinator": [
     { name: "Dashboard", url: "/dashboard", icon: <LayoutDashboard /> },
+    { name: "Manage Project", url: "/manage-project", icon: <Ticket /> },
     { name: "My Ticket", url: "/ticket", icon: <Ticket /> },
+    { name: "Manage Phases", url: "/ticket/phases", icon: <Ticket /> },
   ],
 };
 

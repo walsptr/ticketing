@@ -18,8 +18,7 @@ export async function getProfile(req: NextRequest): Promise<UserData> {
   if (!requestUser) throw new APIServerError();
   const headerUser: UserWithRole = JSON.parse(requestUser);
 
-  const userData: UserWithRoleTeam | undefined = await db.query.users.findFirst(
-    {
+  const userData = (await db.query.users.findFirst({
       where: eq(users.id, headerUser.id),
       with: {
         role: true,
@@ -29,8 +28,7 @@ export async function getProfile(req: NextRequest): Promise<UserData> {
           },
         },
       },
-    }
-  );
+    })) as UserWithRoleTeam | undefined;
 
   if (!userData) {
     logger.error("user not found");

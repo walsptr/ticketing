@@ -38,7 +38,11 @@ export function handlingLogging(
       cloneRequest.body &&
       req.headers.get("Content-Type")?.includes("application/json")
     ) {
-      requestData = await cloneRequest.json();
+      try {
+        requestData = await cloneRequest.json();
+      } catch {
+        requestData = {};
+      }
     } else if (
       cloneRequest.body &&
       req.headers.get("Content-Type")?.includes("multipart/form-data;")

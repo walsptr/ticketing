@@ -36,12 +36,12 @@ export async function updateUserTeam(
     const userId: string = req.nextUrl.pathname.split("/")[3];
 
     // verify user id and check user role
-    const userData: UserWithRole | undefined = await tx.query.users.findFirst({
+    const userData = (await tx.query.users.findFirst({
       where: eq(users.id, userId),
       with: {
         role: true,
       },
-    });
+    })) as UserWithRole | undefined;
 
     if (!userData) {
       logger.error("user not found");
@@ -72,8 +72,7 @@ export async function updateUserTeam(
     await tx.insert(usersToTeams).values(data);
 
     // get new data users
-    const newUserData: UserWithRoleTeam | undefined =
-      await tx.query.users.findFirst({
+    const newUserData = (await tx.query.users.findFirst({
         where: eq(users.id, userId),
         with: {
           role: true,
@@ -83,7 +82,7 @@ export async function updateUserTeam(
             },
           },
         },
-      });
+      })) as UserWithRoleTeam | undefined;
 
     if (!newUserData) {
       logger.info("user data not found");

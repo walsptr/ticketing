@@ -86,6 +86,7 @@ CREATE TABLE "tickets" (
 	"due_date" timestamp,
 	"order" integer NOT NULL,
 	"is_task" boolean DEFAULT false NOT NULL,
+	"ai_auto_reply_enabled" boolean DEFAULT true NOT NULL,
 	"parent_id" uuid,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()
@@ -112,6 +113,8 @@ CREATE TABLE "ticket_replies" (
 	"ticket_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
 	"content" text NOT NULL,
+	"is_ai" boolean DEFAULT false NOT NULL,
+	"reply_to_reply_id" uuid,
 	"duration" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()
@@ -143,6 +146,7 @@ ALTER TABLE "assigned_to_tickets" ADD CONSTRAINT "assigned_to_tickets_ticket_id_
 ALTER TABLE "assigned_to_tickets" ADD CONSTRAINT "assigned_to_tickets_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "ticket_replies" ADD CONSTRAINT "ticket_replies_ticket_id_tickets_id_fk" FOREIGN KEY ("ticket_id") REFERENCES "public"."tickets"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "ticket_replies" ADD CONSTRAINT "ticket_replies_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
+ALTER TABLE "ticket_replies" ADD CONSTRAINT "ticket_replies_reply_to_reply_id_ticket_replies_id_fk" FOREIGN KEY ("reply_to_reply_id") REFERENCES "public"."ticket_replies"("id") ON DELETE set null ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "users_to_teams" ADD CONSTRAINT "users_to_teams_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "users_to_teams" ADD CONSTRAINT "users_to_teams_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 CREATE UNIQUE INDEX "slug_per_team" ON "projects" USING btree ("slug","team_id");

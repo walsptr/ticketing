@@ -63,8 +63,7 @@ export async function updateUserRole(
       .set({ roleId: payload.roleId, updatedAt: new Date() })
       .where(eq(users.id, userId));
 
-    const userData: UserWithRoleTeam | undefined =
-      await tx.query.users.findFirst({
+    const userData = (await tx.query.users.findFirst({
         where: eq(users.id, userId),
         with: {
           role: true,
@@ -74,7 +73,7 @@ export async function updateUserRole(
             },
           },
         },
-      });
+      })) as UserWithRoleTeam | undefined;
 
     if (!userData) {
       logger.info("user data not found");

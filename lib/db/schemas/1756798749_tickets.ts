@@ -42,6 +42,7 @@ export const tickets = pgTable("tickets", {
   dueDate: timestamp("due_date"),
   order: integer("order").notNull(),
   isTask: boolean("is_task").default(false).notNull(),
+  aiAutoReplyEnabled: boolean("ai_auto_reply_enabled").default(true).notNull(),
   parentId: uuid("parent_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

@@ -26,12 +26,12 @@ export function handlingAuth(
     const decoded: any = await decodeAccessToken(accessToken);
 
     // verify user
-    const userData: UserWithRole | undefined = await db.query.users.findFirst({
+    const userData = (await db.query.users.findFirst({
       with: {
         role: true,
       },
       where: eq(users.id, decoded.userId),
-    });
+    })) as UserWithRole | undefined;
 
     if (!userData) {
       logger.error("user not found");

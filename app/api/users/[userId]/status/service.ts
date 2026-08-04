@@ -28,8 +28,7 @@ export async function updateStatus(req: NextRequest): Promise<UserData> {
   const userId: string = req.nextUrl.pathname.split("/")[3];
 
   // check id user
-  const userData: UserWithRoleTeam | undefined = await db.query.users.findFirst(
-    {
+  const userData = (await db.query.users.findFirst({
       where: eq(users.id, userId),
       with: {
         usersToTeams: {
@@ -39,8 +38,7 @@ export async function updateStatus(req: NextRequest): Promise<UserData> {
         },
         role: true,
       },
-    }
-  );
+    })) as UserWithRoleTeam | undefined;
 
   if (!userData) {
     logger.error("user data not found");

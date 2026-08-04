@@ -84,11 +84,13 @@ export default class HttpGateway {
       message: "",
     };
 
+    const hasBody = body !== undefined && body !== null && body !== "";
+
     const response = await fetch(url, {
       method,
-      body,
+      body: hasBody ? body : undefined,
       headers: {
-        "Content-Type": "application/json",
+        ...(hasBody ? { "Content-Type": "application/json" } : {}),
         ...headers,
       },
     });

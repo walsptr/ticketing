@@ -1,10 +1,11 @@
 import { Client } from "pg";
 import "dotenv/config";
+import { getDatabaseSSLConfig } from "lib/utils/env";
 
 async function reset() {
   const client = new Client({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    ssl: getDatabaseSSLConfig(),
   });
 
   await client.connect();

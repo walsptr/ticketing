@@ -5,7 +5,7 @@ import { UserWithRoleTeam } from "lib/db/models";
 import { NextRequest } from "next/server";
 
 export async function getUsers(_req: NextRequest): Promise<UserData[]> {
-  const usersData: UserWithRoleTeam[] = await db.query.users.findMany({
+  const usersData = (await db.query.users.findMany({
     with: {
       role: true,
       usersToTeams: {
@@ -14,7 +14,7 @@ export async function getUsers(_req: NextRequest): Promise<UserData[]> {
         },
       },
     },
-  });
+  })) as UserWithRoleTeam[];
 
   return mapperManyUserWithRoleTeam(usersData);
 }

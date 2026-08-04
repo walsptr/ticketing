@@ -24,4 +24,36 @@
   padding: 4px !important;
 }
 
+.dark .wmde-markdown {
+  background-color: rgb(17 24 39) !important;
+  color: rgb(243 244 246) !important;
+}
+
+.dark .wmde-markdown p,
+.dark .wmde-markdown li,
+.dark .wmde-markdown blockquote,
+.dark .wmde-markdown td,
+.dark .wmde-markdown th,
+.dark .wmde-markdown code,
+.dark .wmde-markdown pre,
+.dark .wmde-markdown strong,
+.dark .wmde-markdown em,
+.dark .wmde-markdown h1,
+.dark .wmde-markdown h2,
+.dark .wmde-markdown h3,
+.dark .wmde-markdown h4,
+.dark .wmde-markdown h5,
+.dark .wmde-markdown h6 {
+  color: inherit !important;
+}
+
+.dark .wmde-markdown a {
+  color: rgb(147 197 253) !important;
+}
+
+.dark .wmde-markdown hr,
+.dark .wmde-markdown table,
+.dark .wmde-markdown blockquote {
+  border-color: rgb(75 85 99) !important;
+}
 

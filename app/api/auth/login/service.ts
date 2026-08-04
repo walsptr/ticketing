@@ -20,8 +20,7 @@ export async function login(
   payload: LoginPayload
 ): Promise<{ user: UserData; auth: AuthData }> {
   // check email
-  const userData: UserWithRoleTeam | undefined = await db.query.users.findFirst(
-    {
+  const userData = (await db.query.users.findFirst({
       where: eq(users.email, payload.email),
       with: {
         role: true,
@@ -31,8 +30,7 @@ export async function login(
           },
         },
       },
-    }
-  );
+    })) as UserWithRoleTeam | undefined;
 
   if (!userData) {
     logger.error("user not found");

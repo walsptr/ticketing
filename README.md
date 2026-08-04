@@ -37,6 +37,141 @@ npm run build
 npm run start
 ```
 
+## Deploy dengan Podman
+
+Project ini sudah disiapkan untuk bootstrap lokal memakai Podman dengan PostgreSQL terpisah.
+
+### Prasyarat
+
+- `podman`
+- `npm`
+- file `.env` lokal
+
+### Setup Env
+
+Project ini sekarang hanya memakai satu file env, yaitu `.env`, baik untuk menjalankan app secara biasa maupun lewat Podman.
+
+Copy template env berikut:
+
+```bash
+cp .env.example .env
+```
+
+Field dasar yang dipakai app dan deploy Podman:
+
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_PORT`
+- `APP_PORT`
+- `DATABASE_URL`
+- `DATABASE_SSL`
+- `JWT_SECRET`
+- `COOKIE_SECURE`
+
+Field AI bersifat opsional. Jika `AI_PROVIDER` dikosongkan maka fitur auto-reply AI tidak aktif.
+
+- `AI_PROVIDER`
+- `AI_BASE_URL`
+- `AI_API_KEY`
+- `AI_MODEL`
+- `AI_SYSTEM_EMAIL`
+- `AI_SYSTEM_NAME`
+- `AI_TEMPERATURE`
+- `AI_MAX_TOKENS`
+- `AI_TIMEOUT_MS`
+
+### Cara Pakai Env
+
+Gunakan satu file `.env`, lalu sesuaikan hanya nilai `DATABASE_URL` berdasarkan cara menjalankan aplikasi:
+
+Untuk `npm run dev` atau app yang berjalan langsung di host:
+
+```env
+DATABASE_URL=postgresql://ticketing:ticketing123@localhost:5432/ticketing?sslmode=disable
+DATABASE_SSL=false
+COOKIE_SECURE=false
+```
+
+Untuk `bash scripts/deploy-podman.sh ...`, app berjalan di dalam container sehingga host database harus memakai nama container Postgres:
+
+```env
+DATABASE_URL=postgresql://ticketing:ticketing123@ticketing-postgres:5432/ticketing?sslmode=disable
+DATABASE_SSL=false
+COOKIE_SECURE=false
+```
+
+Praktiknya:
+
+- Saat develop lokal tanpa container app, gunakan host `localhost`.
+- Saat bootstrap atau menjalankan app lewat Podman, ubah host DB menjadi `ticketing-postgres`.
+- Script deploy Podman otomatis membaca `.env` yang sama.
+- Jika memang perlu file lain untuk eksperimen, script masih bisa diarahkan dengan `ENV_FILE=/path/to/file bash scripts/deploy-podman.sh bootstrap`.
+
+### Konfigurasi AI
+
+Bootstrap AI saat ini mendukung `openai-compatible` dan `ollama`.
+
+Contoh OpenAI-compatible:
+
+```env
+AI_PROVIDER=openai-compatible
+AI_BASE_URL=https://api.openai.com/v1
+AI_API_KEY=sk-xxxx
+AI_MODEL=gpt-4o-mini
+AI_SYSTEM_EMAIL=ai-support@local
+AI_SYSTEM_NAME=AI Support
+AI_TEMPERATURE=0.2
+AI_MAX_TOKENS=400
+AI_TIMEOUT_MS=30000
+```
+
+Contoh Ollama:
+
+```env
+AI_PROVIDER=ollama
+AI_BASE_URL=http://host.containers.internal:11434
+AI_API_KEY=
+AI_MODEL=qwen2.5:7b
+AI_SYSTEM_EMAIL=ai-support@local
+AI_SYSTEM_NAME=AI Support
+AI_TEMPERATURE=0.2
+AI_MAX_TOKENS=400
+AI_TIMEOUT_MS=30000
+```
+
+Perilaku AI yang aktif saat ini:
+
+- AI membuat reply awal setelah ticket dibuat.
+- AI membalas setiap reply manusia baru pada timeline ticket.
+- Tombol `Support Takeover` menghentikan balasan otomatis AI.
+- Tombol `AI Takeover` mengaktifkan lagi AI dan langsung mencoba menjawab reply manusia terbaru yang belum dibalas.
+
+### Bootstrap
+
+Jalankan satu command berikut dari folder `ticketing-dev/`:
+
+```bash
+bash scripts/deploy-podman.sh bootstrap
+```
+
+Command di atas akan:
+
+- build image aplikasi,
+- menjalankan container PostgreSQL,
+- menerapkan schema database,
+- menjalankan seed,
+- menjalankan container aplikasi.
+
+### Command lain
+
+```bash
+bash scripts/deploy-podman.sh status
+bash scripts/deploy-podman.sh logs
+bash scripts/deploy-podman.sh down
+bash scripts/deploy-podman.sh down --volumes
+```
+
 ## Project Structure
 
 ```yaml

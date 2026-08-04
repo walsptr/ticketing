@@ -8,10 +8,12 @@ import { cookies } from "next/headers";
 import { LoginPayload } from "lib/db/dto/payloads/LoginPayload";
 import { UserData } from "lib/db/dto/responses/UserData";
 import { AuthData } from "lib/db/dto/responses/AuthData";
+import { isSecureCookie } from "lib/utils/env";
 
 async function postHandler(req: NextRequest): Promise<NextResponse> {
   const payload = await req.json();
   const validated: LoginPayload = validateAPI(postSchema, payload);
+  const secureCookie = isSecureCookie();
 
   const { user, auth }: { user: UserData; auth: AuthData } = await login(
     req,
@@ -22,7 +24,7 @@ async function postHandler(req: NextRequest): Promise<NextResponse> {
     httpOnly: false,
     path: "/",
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: secureCookie,
     maxAge: 60 * 15, // 15 menit
   });
 
@@ -30,7 +32,7 @@ async function postHandler(req: NextRequest): Promise<NextResponse> {
     httpOnly: true,
     path: "/",
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: secureCookie,
     maxAge: 60 * 60 * 24 * 7, // 7 hari
   });
 
@@ -38,7 +40,7 @@ async function postHandler(req: NextRequest): Promise<NextResponse> {
     httpOnly: true,
     path: "/",
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: secureCookie,
     maxAge: 60 * 60 * 24 * 365, // 1 tahun
   });
 

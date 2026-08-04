@@ -6,7 +6,7 @@ export async function up() {
   const projectsData: Project[] = await db.select().from(projects);
   const phases: any[] = [
     {
-      name: "Backlog",
+      name: "To Do",
       order: 1,
     },
     {
