@@ -147,6 +147,27 @@ Perilaku AI yang aktif saat ini:
 - Tombol `Support Takeover` menghentikan balasan otomatis AI.
 - Tombol `AI Takeover` mengaktifkan lagi AI dan langsung mencoba menjawab reply manusia terbaru yang belum dibalas.
 
+### User Seed (Untuk Testing)
+
+Setelah bootstrap dengan seed, Anda bisa login memakai user berikut:
+
+| Role              | Nama          | Email                | Password   |
+| ----------------- | ------------- | -------------------- | ---------- |
+| Admin             | Admin         | admin@gmail.com      | admin123   |
+| Project Coordinator | Dul         | dul@gmail.com        | test123    |
+| Consultant        | Iqbal         | iqbal@gmail.com      | test123    |
+| Consultant        | Trias         | trias@gmail.com      | test123    |
+| Consultant        | Faaiq         | faaiq@gmail.com      | test123    |
+| Consultant        | Mamat         | mamat@gmail.com      | test123    |
+| Consultant        | Imboy         | imran@gmail.com      | test123    |
+| Consultant        | William TP    | williamtp@gmail.com  | test123    |
+| Consultant        | Chikam        | chikam@gmail.com     | test123    |
+
+Catatan:
+
+- Akun `AI Support` dibuat otomatis saat AI pertama kali berjalan (bukan akun login untuk end user).
+- Password akun consultant dan project coordinator sama untuk keperluan testing lokal.
+
 ### Bootstrap
 
 Jalankan satu command berikut dari folder `ticketing-dev/`:
