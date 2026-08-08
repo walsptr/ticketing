@@ -394,104 +394,27 @@ bash scripts/deploy.sh down --volumes
 
 ---
 
-## Deploy dengan Docker / Podman
+## ⚙️ Konfigurasi Lanjutan (AI + User Seed)
 
-Project ini sudah disiapkan untuk bootstrap lokal memakai Docker atau Podman dengan PostgreSQL terpisah. Script default: `scripts/deploy.sh`.
+### 1. Konfigurasi AI Auto-Reply
 
-### Prasyarat (Rangkuman)
+AI saat ini mendukung dua provider: `openai-compatible` dan `ollama`.
 
-- `docker ATAU podman`
-- `npm`
-- file `.env` lokal
-
-### Setup Env
-
-Project ini sekarang hanya memakai satu file env, yaitu `.env`, baik untuk menjalankan app secara biasa maupun lewat Docker / Podman.
-
-Copy template env berikut:
-
-```bash
-cp .env.example .env
-```
-
-Field dasar yang dipakai app dan deploy Docker/Podman:
-
-- `POSTGRES_DB`
-- `POSTGRES_USER`
-- `POSTGRES_PASSWORD`
-- `POSTGRES_PORT`
-- `APP_PORT`
-- `DATABASE_URL`
-- `DATABASE_SSL`
-- `JWT_SECRET`
-- `COOKIE_SECURE`
-
-Field AI bersifat opsional. Jika `AI_PROVIDER` dikosongkan maka fitur auto-reply AI tidak aktif.
-
-- `AI_PROVIDER`
-- `AI_BASE_URL`
-- `AI_API_KEY`
-- `AI_MODEL`
-- `AI_SYSTEM_EMAIL`
-- `AI_SYSTEM_NAME`
-- `AI_TEMPERATURE`
-- `AI_MAX_TOKENS`
-- `AI_TIMEOUT_MS`
-
-### Cara Pakai Env
-
-Gunakan satu file `.env`, lalu sesuaikan hanya nilai `DATABASE_URL` berdasarkan cara menjalankan aplikasi:
-
-Untuk `npm run dev` atau app yang berjalan langsung di host:
-
-```env
-DATABASE_URL=postgresql://ticketing:ticketing123@localhost:5432/ticketing?sslmode=disable
-DATABASE_SSL=false
-COOKIE_SECURE=false
-```
-
-Untuk `bash scripts/deploy.sh ...`, app berjalan di dalam container sehingga host database harus memakai nama container Postgres:
-
-```env
-DATABASE_URL=postgresql://ticketing:ticketing123@ticketing-postgres:5432/ticketing?sslmode=disable
-DATABASE_SSL=false
-COOKIE_SECURE=false
-```
-
-Praktiknya:
-
-- Saat develop lokal tanpa container app, gunakan host `localhost`.
-- Saat bootstrap atau menjalankan app lewat Docker/Podman, ubah host DB menjadi `ticketing-postgres`.
-- Script deploy Docker/Podman otomatis membaca `.env` yang sama.
-- Jika memang perlu file lain untuk eksperimen, script masih bisa diarahkan dengan `ENV_FILE=/path/to/file bash scripts/deploy.sh bootstrap`.
-
-### Memilih Container Runtime
-Script `scripts/deploy.sh` mendukung dua container engine dengan urutan prioritas:
-- Auto-detect: jika `docker` tersedia di host, pakai Docker; jika tidak coba `podman`.
-- Override via env: `CONTAINER_RUNTIME=docker` atau `CONTAINER_RUNTIME=podman`.
-- Override via flag: `bash scripts/deploy.sh --runtime=docker <command>` atau `--runtime=podman`.
-
-Flag `--runtime=...` jika diset, lebih tinggi prioritasnya dibanding env `CONTAINER_RUNTIME`.
-
-Catatan khusus untuk konfigurasi AI Ollama yang memakai host (bukan container):
-- Untuk Docker: set `AI_BASE_URL=http://host.docker.internal:11434`
-- Untuk Podman: set `AI_BASE_URL=http://host.containers.internal:11434`
-
-### Konfigurasi AI
-
-Bootstrap AI saat ini mendukung `openai-compatible` dan `ollama`.
-
-**Alias Provider yang Didukung** (nilai `AI_PROVIDER` tidak case-sensitive):
+#### Alias Provider yang Didukung (nilai `AI_PROVIDER` tidak case-sensitive)
 - `openai-compatible` bisa diisi: `openai-compatible`, `openai`, `open-ai`, `openai-compat`, `openai_api`
 - `ollama` bisa diisi: `ollama`, `local-ollama`
 
-**Pola Base URL**:
-- Endpoint OpenAI-compatible (OpenAI resmi, self-host v1 style): base URL biasanya diakhiri `/v1` (contoh: `https://api.openai.com/v1`)
+#### Pola Base URL
+- Endpoint OpenAI-compatible (OpenAI resmi, self-host v1 style): base URL biasanya **diakhiri `/v1`** (contoh: `https://api.openai.com/v1`)
 - Endpoint Ollama: **TANPA** `/v1` (contoh host: `http://localhost:11434`) → dari dalam container gunakan
   - Docker: `http://host.docker.internal:11434`
   - Podman: `http://host.containers.internal:11434`
 
-Contoh OpenAI-compatible:
+> 💡 Catatan host mapping Ollama lokal dari dalam container (Docker / Podman):
+> - Untuk Docker: `AI_BASE_URL=http://host.docker.internal:11434`
+> - Untuk Podman: `AI_BASE_URL=http://host.containers.internal:11434`
+
+#### Contoh Konfigurasi OpenAI-compatible
 
 ```env
 AI_PROVIDER=openai-compatible
@@ -499,13 +422,13 @@ AI_BASE_URL=https://api.openai.com/v1
 AI_API_KEY=sk-xxxx
 AI_MODEL=gpt-4o-mini
 AI_SYSTEM_EMAIL=ai-support@local
-AI_SYSTEM_NAME=AI Support
+AI_SYSTEM_NAME="AI Support"
 AI_TEMPERATURE=0.2
 AI_MAX_TOKENS=400
 AI_TIMEOUT_MS=30000
 ```
 
-Contoh Ollama:
+#### Contoh Konfigurasi Ollama Lokal
 
 ```env
 AI_PROVIDER=ollama
@@ -513,20 +436,20 @@ AI_BASE_URL=http://host.containers.internal:11434
 AI_API_KEY=
 AI_MODEL=qwen2.5:7b
 AI_SYSTEM_EMAIL=ai-support@local
-AI_SYSTEM_NAME=AI Support
+AI_SYSTEM_NAME="AI Support"
 AI_TEMPERATURE=0.2
 AI_MAX_TOKENS=400
 AI_TIMEOUT_MS=30000
 ```
 
-Perilaku AI yang aktif saat ini:
+#### Perilaku AI yang Aktif Saat Ini
 
-- AI membuat reply awal setelah ticket dibuat.
-- AI membalas setiap reply manusia baru pada timeline ticket.
-- Tombol `Support Takeover` menghentikan balasan otomatis AI.
+- AI membuat reply awal otomatis setelah ticket dibuat.
+- AI membalas setiap reply manusia baru pada timeline ticket (non-blocking: user tidak menunggu AI generate).
+- Tombol `Support Takeover` menghentikan balasan otomatis AI untuk ticket tersebut.
 - Tombol `AI Takeover` mengaktifkan lagi AI dan langsung mencoba menjawab reply manusia terbaru yang belum dibalas.
 
-**Troubleshooting Warning AI**
+#### Troubleshooting Warning AI
 
 Jika log aplikasi menampilkan pesan `AI runtime config is incomplete. Issues: ...`, berarti ada field AI yang kosong atau invalid. Berikut hal yang perlu dicek:
 
@@ -538,51 +461,30 @@ Jika log aplikasi menampilkan pesan `AI runtime config is incomplete. Issues: ..
 3. **Jika endpoint AI tidak bisa diakses dari dalam container** (misal Ollama lokal di host), pastikan memakai hostname internal container seperti `host.docker.internal` atau `host.containers.internal` di atas, atau pastikan network firewall membolehkan outbound ke IP/port endpoint AI.
 4. **Setelah mengubah `.env`**, untuk menerapkan env baru dengan aman: jalankan `bash scripts/deploy.sh down` (atau `down --volumes` jika perlu reset DB) diikuti `bash scripts/deploy.sh bootstrap` agar image app dan container dibuat fresh kembali (image app akan dihapus dan dibuild ulang otomatis setiap bootstrap).
 
-### User Seed (Untuk Testing)
+---
 
-Setelah bootstrap dengan seed, Anda bisa login memakai user berikut:
+### 2. User Seed (Untuk Testing)
 
-| Role              | Nama          | Email                | Password   |
-| ----------------- | ------------- | -------------------- | ---------- |
-| Admin             | Admin         | admin@gmail.com      | admin123   |
-| Project Coordinator | Dul         | dul@gmail.com        | test123    |
-| Consultant        | Iqbal         | iqbal@gmail.com      | test123    |
-| Consultant        | Trias         | trias@gmail.com      | test123    |
-| Consultant        | Faaiq         | faaiq@gmail.com      | test123    |
-| Consultant        | Mamat         | mamat@gmail.com      | test123    |
-| Consultant        | Imboy         | imran@gmail.com      | test123    |
-| Consultant        | William TP    | williamtp@gmail.com  | test123    |
-| Consultant        | Chikam        | chikam@gmail.com     | test123    |
+Setelah bootstrap dengan seed (baik mode `npm run db:seed` lokal maupun `deploy.sh bootstrap` container), kamu bisa login memakai user berikut:
+
+| Role                | Nama       | Email                | Password |
+| ------------------- | ---------- | -------------------- | -------- |
+| Admin               | Admin      | admin@gmail.com      | admin123 |
+| Project Coordinator | Dul        | dul@gmail.com        | test123  |
+| Consultant          | Iqbal      | iqbal@gmail.com      | test123  |
+| Consultant          | Trias      | trias@gmail.com      | test123  |
+| Consultant          | Faaiq      | faaiq@gmail.com      | test123  |
+| Consultant          | Mamat      | mamat@gmail.com      | test123  |
+| Consultant          | Imboy      | imran@gmail.com      | test123  |
+| Consultant          | William TP | williamtp@gmail.com  | test123  |
+| Consultant          | Chikam     | chikam@gmail.com     | test123  |
 
 Catatan:
 
 - Akun `AI Support` dibuat otomatis saat AI pertama kali berjalan (bukan akun login untuk end user).
 - Password akun consultant dan project coordinator sama untuk keperluan testing lokal.
 
-### Bootstrap
-
-Jalankan satu command berikut dari folder `ticketing-dev/`:
-
-```bash
-bash scripts/deploy.sh bootstrap
-```
-
-Command di atas akan:
-
-- build image aplikasi,
-- menjalankan container PostgreSQL,
-- menerapkan schema database,
-- menjalankan seed,
-- menjalankan container aplikasi.
-
-### Command lain
-
-```bash
-bash scripts/deploy.sh status
-bash scripts/deploy.sh logs
-bash scripts/deploy.sh down
-bash scripts/deploy.sh down --volumes
-```
+---
 
 ## Project Structure
 
