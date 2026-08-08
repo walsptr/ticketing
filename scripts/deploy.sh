@@ -13,6 +13,8 @@ APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-ticketing-app}"
 APP_IMAGE_NAME="${APP_IMAGE_NAME:-ticketing-app:local}"
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-docker.io/library/postgres:16-alpine}"
 
+CONTAINER_CLI=""
+
 log() {
   printf '[ticketing] %s\n' "$*"
 }
@@ -28,6 +30,60 @@ require_command() {
 
 require_env_file() {
   [[ -f "${ENV_FILE}" ]] || die "File env tidak ditemukan: ${ENV_FILE}. Copy dari .env.example terlebih dahulu."
+}
+
+resolve_runtime() {
+  if [[ -n "${RUNTIME_FLAG:-}" ]]; then
+    CONTAINER_CLI="${RUNTIME_FLAG}"
+  elif [[ -n "${CONTAINER_RUNTIME:-}" ]]; then
+    CONTAINER_CLI="${CONTAINER_RUNTIME}"
+  else
+    if command -v docker >/dev/null 2>&1; then
+      CONTAINER_CLI="docker"
+    elif command -v podman >/dev/null 2>&1; then
+      CONTAINER_CLI="podman"
+    else
+      die "Docker dan Podman tidak terinstall."
+    fi
+  fi
+
+  require_command "$CONTAINER_CLI"
+}
+
+cli_network_exists() {
+  local net="$1"
+  if [[ "$CONTAINER_CLI" == "podman" ]]; then
+    "$CONTAINER_CLI" network exists "$net"
+  else
+    "$CONTAINER_CLI" network inspect "$net" >/dev/null 2>&1
+  fi
+}
+
+cli_container_exists() {
+  local name="$1"
+  if [[ "$CONTAINER_CLI" == "podman" ]]; then
+    "$CONTAINER_CLI" container exists "$name"
+  else
+    "$CONTAINER_CLI" inspect "$name" >/dev/null 2>&1
+  fi
+}
+
+cli_volume_exists() {
+  local vol="$1"
+  if [[ "$CONTAINER_CLI" == "podman" ]]; then
+    "$CONTAINER_CLI" volume exists "$vol"
+  else
+    "$CONTAINER_CLI" volume inspect "$vol" >/dev/null 2>&1
+  fi
+}
+
+cli_image_exists() {
+  local image="$1"
+  if [[ "$CONTAINER_CLI" == "podman" ]]; then
+    "$CONTAINER_CLI" image exists "$image"
+  else
+    "$CONTAINER_CLI" image inspect "$image" >/dev/null 2>&1
+  fi
 }
 
 load_env() {
@@ -54,36 +110,41 @@ load_env() {
 }
 
 ensure_network() {
-  if ! podman network exists "${NETWORK_NAME}"; then
+  if ! cli_network_exists "${NETWORK_NAME}"; then
     log "Membuat network ${NETWORK_NAME}"
-    podman network create "${NETWORK_NAME}" >/dev/null
+    "$CONTAINER_CLI" network create "${NETWORK_NAME}" >/dev/null
   fi
 }
 
 ensure_volume() {
-  if ! podman volume exists "${DB_VOLUME_NAME}"; then
+  if ! cli_volume_exists "${DB_VOLUME_NAME}"; then
     log "Membuat volume ${DB_VOLUME_NAME}"
-    podman volume create "${DB_VOLUME_NAME}" >/dev/null
+    "$CONTAINER_CLI" volume create "${DB_VOLUME_NAME}" >/dev/null
   fi
 }
 
 remove_container_if_exists() {
   local name="$1"
-  if podman container exists "${name}"; then
+  if cli_container_exists "${name}"; then
     log "Menghapus container lama ${name}"
-    podman rm -f "${name}" >/dev/null
+    "$CONTAINER_CLI" rm -f "${name}" >/dev/null
   fi
 }
 
 build_image() {
+  local target_image="localhost/ticketing-app:local"
+  if cli_image_exists "${target_image}"; then
+    log "Menghapus image app lama localhost/ticketing-app:local untuk rebuild fresh"
+    "$CONTAINER_CLI" rmi -f "localhost/ticketing-app:local" >/dev/null
+  fi
   log "Build image aplikasi ${APP_IMAGE_NAME}"
-  podman build -t "${APP_IMAGE_NAME}" "${PROJECT_ROOT}"
+  "$CONTAINER_CLI" build -t "${APP_IMAGE_NAME}" "${PROJECT_ROOT}"
 }
 
 run_postgres() {
   remove_container_if_exists "${DB_CONTAINER_NAME}"
   log "Menjalankan Postgres ${DB_CONTAINER_NAME}"
-  podman run -d \
+  "$CONTAINER_CLI" run -d \
     --name "${DB_CONTAINER_NAME}" \
     --network "${NETWORK_NAME}" \
     -p "${POSTGRES_PORT}:5432" \
@@ -100,7 +161,7 @@ wait_for_postgres() {
   local attempt=1
 
   while (( attempt <= retries )); do
-    if podman exec "${DB_CONTAINER_NAME}" pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1; then
+    if "$CONTAINER_CLI" exec "${DB_CONTAINER_NAME}" pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1; then
       log "Postgres siap"
       return 0
     fi
@@ -114,14 +175,14 @@ wait_for_postgres() {
 
 apply_schema() {
   log "Menerapkan schema database dari drizzle SQL"
-  podman exec -i "${DB_CONTAINER_NAME}" psql \
+  "$CONTAINER_CLI" exec -i "${DB_CONTAINER_NAME}" psql \
     -U "${POSTGRES_USER}" \
     -d "${POSTGRES_DB}" < "${PROJECT_ROOT}/drizzle/0000_mature_skullbuster.sql"
 }
 
 run_seed() {
   log "Menjalankan seed database"
-  podman run --rm \
+  "$CONTAINER_CLI" run --rm \
     --network "${NETWORK_NAME}" \
     --env-file "${ENV_FILE}" \
     -e DATABASE_SSL="${DATABASE_SSL}" \
@@ -134,7 +195,7 @@ run_seed() {
 run_app() {
   remove_container_if_exists "${APP_CONTAINER_NAME}"
   log "Menjalankan aplikasi ${APP_CONTAINER_NAME}"
-  podman run -d \
+  "$CONTAINER_CLI" run -d \
     --name "${APP_CONTAINER_NAME}" \
     --network "${NETWORK_NAME}" \
     -p "${APP_PORT}:3000" \
@@ -147,12 +208,12 @@ run_app() {
 
 show_status() {
   log "Status container"
-  podman ps --filter "name=${DB_CONTAINER_NAME}" --filter "name=${APP_CONTAINER_NAME}"
+  "$CONTAINER_CLI" ps --filter "name=${DB_CONTAINER_NAME}" --filter "name=${APP_CONTAINER_NAME}"
   log "Aplikasi tersedia di http://localhost:${APP_PORT}"
 }
 
 bootstrap() {
-  require_command podman
+  resolve_runtime
   load_env
   ensure_network
   ensure_volume
@@ -166,12 +227,12 @@ bootstrap() {
 }
 
 up() {
-  require_command podman
+  resolve_runtime
   load_env
   ensure_network
   ensure_volume
   build_image
-  if ! podman container exists "${DB_CONTAINER_NAME}"; then
+  if ! cli_container_exists "${DB_CONTAINER_NAME}"; then
     run_postgres
     wait_for_postgres
   else
@@ -182,14 +243,14 @@ up() {
 }
 
 down() {
-  require_command podman
+  resolve_runtime
   local remove_volumes="${1:-false}"
   remove_container_if_exists "${APP_CONTAINER_NAME}"
   remove_container_if_exists "${DB_CONTAINER_NAME}"
   if [[ "${remove_volumes}" == "true" ]]; then
-    if podman volume exists "${DB_VOLUME_NAME}"; then
+    if cli_volume_exists "${DB_VOLUME_NAME}"; then
       log "Menghapus volume ${DB_VOLUME_NAME}"
-      podman volume rm -f "${DB_VOLUME_NAME}" >/dev/null
+      "$CONTAINER_CLI" volume rm -f "${DB_VOLUME_NAME}" >/dev/null
     fi
     log "Container dihentikan. Volume ${DB_VOLUME_NAME} juga dihapus."
     return 0
@@ -199,25 +260,25 @@ down() {
 }
 
 logs() {
-  require_command podman
-  podman logs -f "${APP_CONTAINER_NAME}"
+  resolve_runtime
+  "$CONTAINER_CLI" logs -f "${APP_CONTAINER_NAME}"
 }
 
 status() {
-  require_command podman
+  resolve_runtime
   load_env
   show_status
 }
 
 seed() {
-  require_command podman
+  resolve_runtime
   load_env
   run_seed
 }
 
 usage() {
   cat <<EOF
-Usage: bash scripts/deploy-podman.sh <command> [options]
+Usage: bash scripts/deploy.sh [--runtime=docker|podman] <command> [options]
 
 Commands:
   bootstrap   Build image, start Postgres, apply schema, seed, lalu run app
@@ -228,16 +289,41 @@ Commands:
   status      Tampilkan status container
 
 Options:
-  --volumes   Khusus untuk command down, hapus volume database juga
+  --runtime=docker|podman  Override pemilihan container runtime
+  --volumes                 Khusus untuk command down, hapus volume database juga
 
 Environment:
-  ENV_FILE    Path ke file env. Default: ${PROJECT_ROOT}/.env
+  CONTAINER_RUNTIME         Override container runtime (docker atau podman)
+  ENV_FILE                  Path ke file env. Default: ${PROJECT_ROOT}/.env
 EOF
 }
 
 main() {
-  local command="${1:-}"
-  local option="${2:-}"
+  RUNTIME_FLAG=""
+  local command=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --runtime=*)
+        local runtime_value="${1#--runtime=}"
+        if [[ "${runtime_value}" != "docker" && "${runtime_value}" != "podman" ]]; then
+          die "Runtime tidak didukung: ${runtime_value}. Pilih 'docker' atau 'podman'."
+        fi
+        RUNTIME_FLAG="${runtime_value}"
+        shift
+        ;;
+      --*)
+        die "Flag tidak dikenal: $1"
+        ;;
+      *)
+        command="$1"
+        shift
+        break
+        ;;
+    esac
+  done
+
+  local option="${1:-}"
 
   case "${command}" in
     bootstrap) bootstrap ;;

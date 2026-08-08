@@ -1,5 +1,6 @@
 "use client";
 
+import { isFailedMessage, isPlaceholderContent } from "lib/ai/placeholder";
 import { useState } from "react";
 import MarkdownPreview from "@uiw/react-markdown-preview";
 import { toast } from "sonner";
@@ -8,6 +9,7 @@ import DangerButton from "components/forminput/DangerButton";
 import HttpGateway from "lib/middlewares/web/HttpGateway";
 import { TicketReplyData } from "lib/db/dto/responses/TicketReplyData";
 import TicketReplyEditor from "./TicketReplyEditor";
+import TypingIndicator from "./TypingIndicator";
 
 type TicketReplyItemProps = {
   ticketId: string;
@@ -41,6 +43,10 @@ export default function TicketReplyItem({
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(reply.content);
   const [isLoading, setIsLoading] = useState(false);
+
+  const isTypingPlaceholder = Boolean(reply.isAi && isPlaceholderContent(reply.content));
+  const isFailedAiReply = Boolean(reply.isAi && isFailedMessage(reply.content));
+  const isAiManaged = isTypingPlaceholder || isFailedAiReply;
 
   const save = async () => {
     const nextContent = draft.trim();
@@ -82,9 +88,20 @@ export default function TicketReplyItem({
               {reply.author.name}
             </p>
             {reply.isAi ? (
-              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-200">
-                AI Support
-              </span>
+              isTypingPlaceholder ? (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 flex items-center gap-1 dark:bg-amber-900/30 dark:text-amber-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  Mengetik...
+                </span>
+              ) : isFailedAiReply ? (
+                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-200">
+                  Gagal membalas
+                </span>
+              ) : (
+                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-200">
+                  AI Support
+                </span>
+              )
             ) : null}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -104,7 +121,7 @@ export default function TicketReplyItem({
           ) : null}
         </div>
 
-        {reply.isOwner ? (
+        {reply.isOwner && !isAiManaged ? (
           <div className="flex items-center gap-2">
             {!isEditing ? (
               <>
@@ -155,15 +172,28 @@ export default function TicketReplyItem({
             </div>
           </div>
         ) : (
-          <div
-            data-color-mode="dark"
-            className="dark:[&_.wmde-markdown]:bg-gray-900 dark:[&_.wmde-markdown]:text-gray-100"
-          >
-            <MarkdownPreview
-              source={reply.content}
-              className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm dark:border-gray-700 dark:bg-gray-900"
-            />
-          </div>
+          isTypingPlaceholder ? (
+            <div data-color-mode="dark" className="dark:[&_.wmde-markdown]:bg-gray-900 dark:[&_.wmde-markdown]:text-gray-100">
+              <TypingIndicator />
+            </div>
+          ) : isFailedAiReply ? (
+            <div
+              data-color-mode="dark"
+              className="dark:[&_.wmde-markdown]:bg-gray-900 dark:[&_.wmde-markdown]:text-gray-100"
+            >
+              <MarkdownPreview
+                source={reply.content}
+                className="rounded-lg border border-rose-200 bg-rose-50/60 p-4 text-sm dark:border-rose-900/40 dark:bg-rose-900/10"
+              />
+            </div>
+          ) : (
+            <div data-color-mode="dark" className="dark:[&_.wmde-markdown]:bg-gray-900 dark:[&_.wmde-markdown]:text-gray-100">
+              <MarkdownPreview
+                source={reply.content}
+                className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm dark:border-gray-700 dark:bg-gray-900"
+              />
+            </div>
+          )
         )}
       </div>
     </div>

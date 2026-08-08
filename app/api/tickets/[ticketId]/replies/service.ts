@@ -1,12 +1,18 @@
 import { db } from "config/db";
+import { logger } from "config/winston";
 import { eq } from "drizzle-orm";
 import { normalizeMarkdownForStorage } from "lib/ai/markdownPipeline";
-import { createAiReplyForHumanReply } from "lib/ai/ticketAutoReply";
+import {
+  createAiReplyForHumanReply,
+  ensureAiSupportUser,
+  ensureInsertAiPlaceholder,
+  scheduleBackgroundTask,
+} from "lib/ai/ticketAutoReply";
 import { CreateTicketReplyPayload } from "lib/db/dto/payloads/CreateTicketReplyPayload";
 import { CreateTicketReplyResult } from "lib/db/dto/responses/CreateTicketReplyResult";
 import { TicketReplyData } from "lib/db/dto/responses/TicketReplyData";
 import { Role } from "lib/db/models";
-import { ticketReplies } from "lib/db/schemas";
+import { ticketReplies, tickets } from "lib/db/schemas";
 import { APIDataNotFoundError } from "lib/errors/api/APIDataNotFoundError";
 import { APIResponseError } from "lib/errors/api/APIResponseError";
 import { NextRequest } from "next/server";
@@ -86,12 +92,34 @@ export async function createReply(
     return mapReply(detailReply, headerUser.id);
   });
 
-  const aiReply = await createAiReplyForHumanReply(ticketId, reply.id);
+  const aiReply = null;
 
-  return {
-    reply,
-    aiReply,
-  };
+  const quickTicket = await db.query.tickets.findFirst({
+    where: eq(tickets.id, ticketId),
+    columns: { aiAutoReplyEnabled: true, id: true },
+  });
+
+  if (quickTicket?.aiAutoReplyEnabled) {
+    try {
+      const aiUser = await ensureAiSupportUser();
+      const placeholder = await ensureInsertAiPlaceholder({
+        ticketId,
+        aiUserId: aiUser.id,
+        replyToReplyId: reply.id,
+      });
+
+      scheduleBackgroundTask(
+        () => createAiReplyForHumanReply(ticketId, reply.id, { placeholderReplyId: placeholder.replyId }).then(() => undefined),
+        `followup-ai:${ticketId}:${reply.id}`
+      );
+    } catch (err) {
+      logger.warn("Failed to queue followup AI placeholder for reply", {
+        ticketId, replyId: reply.id, error: err,
+      });
+    }
+  }
+
+  return { reply, aiReply };
 }
 
 export { mapReply };

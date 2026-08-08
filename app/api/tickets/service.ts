@@ -1,7 +1,13 @@
 import { db } from "config/db";
+import { logger } from "config/winston";
 import { and, eq } from "drizzle-orm";
 import { normalizeMarkdownForStorage } from "lib/ai/markdownPipeline";
-import { createInitialAiReplyForTicket } from "lib/ai/ticketAutoReply";
+import {
+  createInitialAiReplyForTicket,
+  ensureAiSupportUser,
+  ensureInsertAiPlaceholder,
+  scheduleBackgroundTask,
+} from "lib/ai/ticketAutoReply";
 import { CreateTicketPayload } from "lib/db/dto/payloads/CreateTicketPayload";
 import { TicketDetailData } from "lib/db/dto/responses/TicketDetailData";
 import { AssignedToTicketInsert, UserWithRole } from "lib/db/models";
@@ -179,7 +185,31 @@ export async function createTicket(
     return mapTicketDetail(ticket);
   });
 
-  await createInitialAiReplyForTicket(createdTicket.id);
+  const quickTicket = await db.query.tickets.findFirst({
+    where: eq(tickets.id, createdTicket.id),
+    columns: { aiAutoReplyEnabled: true, id: true, projectId: true },
+  });
+
+  if (quickTicket?.aiAutoReplyEnabled) {
+    try {
+      const aiUser = await ensureAiSupportUser();
+      const placeholder = await ensureInsertAiPlaceholder({
+        ticketId: createdTicket.id,
+        aiUserId: aiUser.id,
+        replyToReplyId: null,
+      });
+
+      scheduleBackgroundTask(
+        () => createInitialAiReplyForTicket(createdTicket.id, { placeholderReplyId: placeholder.replyId }).then(() => undefined),
+        `initial-ai:${createdTicket.id}`
+      );
+    } catch (err) {
+      logger.warn("Failed to queue initial AI placeholder for ticket", {
+        ticketId: createdTicket.id,
+        error: err,
+      });
+    }
+  }
 
   return createdTicket;
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import HttpGateway from "lib/middlewares/web/HttpGateway";
+import { isPlaceholderContent } from "lib/ai/placeholder";
 import { CreateTicketReplyResult } from "lib/db/dto/responses/CreateTicketReplyResult";
 import { TicketDetailPageData } from "lib/db/dto/responses/TicketDetailPageData";
 import { TicketReplyData } from "lib/db/dto/responses/TicketReplyData";
@@ -52,6 +53,16 @@ export default function TicketDetailPage() {
   const [detail, setDetail] = useState<TicketDetailPageData>(initialDetail);
   const [isLoading, setIsLoading] = useState(true);
   const [isTogglingAi, setIsTogglingAi] = useState(false);
+  const [pollingCount, setPollingCount] = useState<number>(0);
+  const isAwaitingAiRef = useRef<boolean>(false);
+
+  const anyRepliesPlaceholderPending = (detailReplies?: TicketReplyData[]): boolean => {
+    if (!detailReplies) return false;
+    for (const reply of detailReplies) {
+      if (reply.isAi && isPlaceholderContent(reply.content)) return true;
+    }
+    return false;
+  };
 
   const boardHref = useMemo(() => {
     return projectId ? `/ticket?projectId=${encodeURIComponent(projectId)}` : "/ticket";
@@ -78,6 +89,40 @@ export default function TicketDetailPage() {
   useEffect(() => {
     fetchDetail();
   }, [fetchDetail]);
+
+  useEffect(() => {
+    if (!detail || !detail.ticket.id) return;
+    if (pollingCount >= 12) return;
+
+    isAwaitingAiRef.current =
+      anyRepliesPlaceholderPending(detail.replies) && detail.ticket.aiAutoReplyEnabled === true;
+
+    if (!isAwaitingAiRef.current) return;
+
+    let intervalId: any | null = null;
+    let isCancelled = false;
+
+    const tick = async () => {
+      if (document.hidden) return;
+      try {
+        const { status, data } = await HttpGateway.secureHttpGet(
+          `/api/tickets/${detail.ticket.id}/detail?projectId=${encodeURIComponent(projectId)}`
+        );
+        if (isCancelled) return;
+        if (status === 200 && data && data.data) {
+          setDetail(data.data as TicketDetailPageData);
+          setPollingCount((c) => c + 1);
+        }
+      } catch {}
+    };
+
+    intervalId = setInterval(tick, 5000);
+
+    return () => {
+      isCancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [detail, detail.ticket.id, projectId, pollingCount]);
 
   const appendReplies = (replies: TicketReplyData[]) => {
     setDetail((prev) => ({
@@ -179,6 +224,14 @@ export default function TicketDetailPage() {
             projectId={projectId}
             onCreated={appendReplyResult}
           />
+          {pollingCount < 12 && anyRepliesPlaceholderPending(detail.replies) ? (
+            <div className="mb-2 text-right">
+              <span className="text-xs italic text-gray-500 dark:text-gray-400 flex items-center gap-1 justify-end">
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-pulse"></span>
+                Menyegarkan otomatis... ({pollingCount}/12)
+              </span>
+            </div>
+          ) : null}
           <TicketReplyList
             ticketId={ticketId}
             projectId={projectId}

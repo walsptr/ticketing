@@ -36,6 +36,40 @@ function stripHtmlNodes(node: any): any {
   return node;
 }
 
+function preprocessFenceSanitize(input: string): string {
+  const lines = input.split("\n");
+  const processed = lines.map((line) => {
+    const match = line.match(/^(\s*)([`~]{4,})\s*([a-zA-Z0-9_+-]*)\s*$/);
+    if (match) {
+      const prefix = match[1];
+      const fenceChar = match[2][0];
+      const info = match[3];
+      const marker3 = fenceChar.repeat(3);
+      return prefix + marker3 + (info.trim() ? " " + info : "");
+    }
+    return line;
+  });
+  return processed.join("\n");
+}
+
+function fallbackMarkdownSanitize(input: string): string {
+  let out = normalizeNewlines(String(input ?? ""));
+  out = preprocessFenceSanitize(out);
+  out = out.replace(/<[^>]+>/g, "");
+  out = out.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+  return out.trim();
+}
+
+function maskSensitiveInline(input: string): string {
+  let out = String(input ?? "");
+  out = out.replace(/sk-[A-Za-z0-9_-]+/gi, "sk-***");
+  out = out.replace(/([?&](token|api_key|password|key)=[^&#\s]+)/gi, "$1=***");
+  if (out.length > 200) {
+    out = out.substring(0, 200) + "... (truncated)";
+  }
+  return out;
+}
+
 function createProcessor() {
   return unified()
     .use(remarkParse)
@@ -43,7 +77,7 @@ function createProcessor() {
     .use(remarkStringify as any, {
       bullet: "-",
       fences: true,
-      fence: "```",
+      fence: "`",
       listItemIndent: "one",
     });
 }
@@ -52,11 +86,21 @@ export function normalizeMarkdownForStorage(input: string): string {
   const base = normalizeNewlines(String(input ?? "")).trim();
   if (!base) return "";
 
-  const processor = createProcessor();
-  const tree = stripHtmlNodes(processor.parse(base));
-  const transformed = processor.runSync(tree);
-  const out = String(processor.stringify(transformed)).trim();
-  return out;
+  try {
+    const sanitizedBase = preprocessFenceSanitize(base);
+    const processor = createProcessor();
+    const tree = stripHtmlNodes(processor.parse(sanitizedBase));
+    const transformed = processor.runSync(tree);
+    const out = String(processor.stringify(transformed)).trim();
+    return out;
+  } catch (err) {
+    console.warn(
+      "[markdownPipeline] normalizeMarkdownForStorage remark failed (fallback sanitize). Error: %s. Input preview (masked): %s",
+      (err as any)?.message ?? String(err),
+      maskSensitiveInline(String(input ?? ""))
+    );
+    return fallbackMarkdownSanitize(input);
+  }
 }
 
 function joinInlineNodes(nodes: any[]): string {
@@ -188,88 +232,106 @@ export function markdownToAiChunks(input: string): AiChunk[] {
   const base = normalizeNewlines(String(input ?? "")).trim();
   if (!base) return [];
 
-  const processor = createProcessor();
-  const tree = stripHtmlNodes(processor.parse(base));
-  const transformed = processor.runSync(tree) as any;
+  try {
+    const processor = createProcessor();
+    const tree = stripHtmlNodes(processor.parse(base));
+    const transformed = processor.runSync(tree) as any;
 
-  const children = Array.isArray(transformed.children) ? transformed.children : [];
-  const chunks: AiChunk[] = [];
+    const children = Array.isArray(transformed.children) ? transformed.children : [];
+    const chunks: AiChunk[] = [];
 
-  for (const child of children) {
-    if (!child || typeof child !== "object") continue;
+    for (const child of children) {
+      if (!child || typeof child !== "object") continue;
 
-    if (child.type === "heading") {
-      const level = typeof child.depth === "number" ? child.depth : 1;
-      const text = (child.children ? joinInlineNodes(child.children) : toString(child)).trim();
-      if (!text) continue;
-      chunks.push({ type: "heading", text, meta: { level } });
-      continue;
-    }
+      if (child.type === "heading") {
+        const level = typeof child.depth === "number" ? child.depth : 1;
+        const text = (child.children ? joinInlineNodes(child.children) : toString(child)).trim();
+        if (!text) continue;
+        chunks.push({ type: "heading", text, meta: { level } });
+        continue;
+      }
 
-    if (child.type === "paragraph") {
+      if (child.type === "paragraph") {
+        const text = blockNodeToText(child);
+        if (!text) continue;
+        chunks.push({ type: "paragraph", text });
+        continue;
+      }
+
+      if (child.type === "list") {
+        const { text, meta } = listToText(child);
+        if (!text) continue;
+        chunks.push({ type: "list", text, meta });
+        continue;
+      }
+
+      if (child.type === "code") {
+        const text = blockNodeToText(child);
+        if (!text) continue;
+        const lang = String(child.lang ?? "").trim() || null;
+        chunks.push({ type: "code", text, meta: { lang } });
+        continue;
+      }
+
+      if (child.type === "blockquote") {
+        const text = blockNodeToText(child);
+        if (!text) continue;
+        chunks.push({ type: "blockquote", text });
+        continue;
+      }
+
+      if (child.type === "table") {
+        const text = blockNodeToText(child);
+        if (!text) continue;
+        chunks.push({ type: "table", text });
+        continue;
+      }
+
+      if (child.type === "thematicBreak") {
+        chunks.push({ type: "thematicBreak", text: "---" });
+        continue;
+      }
+
       const text = blockNodeToText(child);
-      if (!text) continue;
-      chunks.push({ type: "paragraph", text });
-      continue;
+      if (text) {
+        chunks.push({ type: "paragraph", text });
+      }
     }
 
-    if (child.type === "list") {
-      const { text, meta } = listToText(child);
-      if (!text) continue;
-      chunks.push({ type: "list", text, meta });
-      continue;
-    }
-
-    if (child.type === "code") {
-      const text = blockNodeToText(child);
-      if (!text) continue;
-      const lang = String(child.lang ?? "").trim() || null;
-      chunks.push({ type: "code", text, meta: { lang } });
-      continue;
-    }
-
-    if (child.type === "blockquote") {
-      const text = blockNodeToText(child);
-      if (!text) continue;
-      chunks.push({ type: "blockquote", text });
-      continue;
-    }
-
-    if (child.type === "table") {
-      const text = blockNodeToText(child);
-      if (!text) continue;
-      chunks.push({ type: "table", text });
-      continue;
-    }
-
-    if (child.type === "thematicBreak") {
-      chunks.push({ type: "thematicBreak", text: "---" });
-      continue;
-    }
-
-    const text = blockNodeToText(child);
-    if (text) {
-      chunks.push({ type: "paragraph", text });
-    }
+    return chunks;
+  } catch (err) {
+    console.warn(
+      "[markdownPipeline] markdownToAiChunks failed (fallback paragraph). Error: %s. Input preview (masked): %s",
+      (err as any)?.message ?? String(err),
+      maskSensitiveInline(String(input ?? ""))
+    );
+    return [{ type: "paragraph", text: fallbackMarkdownSanitize(input) }];
   }
-
-  return chunks;
 }
 
 export function markdownToAiText(input: string): string {
-  const chunks = markdownToAiChunks(input);
-  if (chunks.length === 0) return "";
+  try {
+    const chunks = markdownToAiChunks(input);
+    if (chunks.length === 0) return "";
 
-  const lines: string[] = [];
-  for (const chunk of chunks) {
-    if (chunk.type === "heading") {
-      const level = Number(chunk.meta?.level ?? 1);
-      const prefix = "#".repeat(Math.min(Math.max(level, 1), 6));
-      lines.push(`${prefix} ${chunk.text}`.trim());
-      continue;
+    const lines: string[] = [];
+    for (const chunk of chunks) {
+      if (chunk.type === "heading") {
+        const level = Number(chunk.meta?.level ?? 1);
+        const prefix = "#".repeat(Math.min(Math.max(level, 1), 6));
+        lines.push(`${prefix} ${chunk.text}`.trim());
+        continue;
+      }
+      lines.push(chunk.text.trim());
     }
-    lines.push(chunk.text.trim());
-  }
 
-  return lines.filter(Boolean).join("\n\n").trim();
+    return lines.filter(Boolean).join("\n\n").trim();
+  } catch (err) {
+    console.warn(
+      "[markdownPipeline] markdownToAiText failed (fallback sanitize). Error: %s. Input preview (masked): %s",
+      (err as any)?.message ?? String(err),
+      maskSensitiveInline(String(input ?? ""))
+    );
+    return fallbackMarkdownSanitize(input);
+  }
 }

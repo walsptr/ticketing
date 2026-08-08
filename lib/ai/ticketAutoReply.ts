@@ -1,3 +1,8 @@
+import {
+  AI_PLACEHOLDER_FAILED_MESSAGE,
+  isPlaceholderContent,
+  makePlaceholderContent,
+} from "./placeholder";
 import { logger } from "config/winston";
 import { db } from "config/db";
 import { and, eq, isNull } from "drizzle-orm";
@@ -6,6 +11,7 @@ import { Role } from "lib/db/models";
 import { ticketReplies, tickets } from "lib/db/schemas";
 import { getAiClient } from "./client";
 import { ensureAiSupportUser } from "./ensureAiSupportUser";
+export { ensureAiSupportUser };
 import { markdownToAiText, normalizeMarkdownForStorage } from "./markdownPipeline";
 
 type TicketThreadReply = typeof ticketReplies.$inferSelect & {
@@ -221,9 +227,61 @@ async function insertAiReply(args: {
   );
 }
 
+export function scheduleBackgroundTask(fn: () => Promise<void>, contextLabel: string): void {
+  const safeTask = async () => {
+    try { await fn(); }
+    catch (err) { logger.warn("AI background task failed", { contextLabel, error: err }); }
+  };
+  if (typeof (globalThis as any).setImmediate === "function") { (globalThis as any).setImmediate(safeTask); }
+  else { setTimeout(safeTask, 0); }
+}
+
+export async function ensureInsertAiPlaceholder(args: { ticketId: string; aiUserId: string; replyToReplyId?: string | null; }): Promise<{ replyId: string; placeholderContent: string; inserted: boolean; }> {
+  const existingItems = await db.query.ticketReplies.findMany({
+    where: and(
+      eq(ticketReplies.ticketId, args.ticketId),
+      eq(ticketReplies.isAi, true),
+      args.replyToReplyId ? eq(ticketReplies.replyToReplyId, args.replyToReplyId) : isNull(ticketReplies.replyToReplyId)
+    )
+  });
+
+  for (const item of existingItems) {
+    if (isPlaceholderContent(item.content)) {
+      return { replyId: item.id, placeholderContent: item.content, inserted: false };
+    }
+  }
+
+  const placeholderContent = makePlaceholderContent();
+  const inserted = (await db
+    .insert(ticketReplies)
+    .values({
+      ticketId: args.ticketId,
+      userId: args.aiUserId,
+      content: placeholderContent,
+      isAi: true,
+      replyToReplyId: args.replyToReplyId ?? null,
+      duration: 0,
+    })
+    .returning()) as Array<typeof ticketReplies.$inferSelect>;
+
+  const row = inserted[0];
+  return { replyId: row.id, placeholderContent, inserted: true };
+}
+
+export async function resolveAiPlaceholderReply(args: { placeholderReplyId: string; finalContent: string | null; failed?: boolean; }): Promise<void> {
+  try {
+    const final = (!args.failed && args.finalContent !== null) ? String(args.finalContent) : AI_PLACEHOLDER_FAILED_MESSAGE;
+    await db.update(ticketReplies).set({ content: final }).where(eq(ticketReplies.id, args.placeholderReplyId));
+  } catch (err) {
+    logger.warn("Failed to resolve AI placeholder reply", { placeholderReplyId: args.placeholderReplyId, error: err });
+  }
+}
+
 export async function createInitialAiReplyForTicket(
-  ticketId: string
+  ticketId: string,
+  opts?: { placeholderReplyId?: string }
 ): Promise<TicketReplyData | null> {
+  const placeholderReplyId = opts?.placeholderReplyId;
   try {
     const thread = await loadTicketThread(ticketId);
     if (!thread || !thread.aiAutoReplyEnabled || !thread.project || !thread.phase) {
@@ -234,12 +292,24 @@ export async function createInitialAiReplyForTicket(
       where: and(eq(ticketReplies.ticketId, ticketId), eq(ticketReplies.isAi, true), isNull(ticketReplies.replyToReplyId)),
     });
     if (existingInitialAiReply) {
-      return null;
+      const isSelfPlaceholder = isPlaceholderContent(existingInitialAiReply.content);
+      const isOwnTarget = typeof placeholderReplyId === "string" && existingInitialAiReply.id === placeholderReplyId;
+      if (!isSelfPlaceholder && !isOwnTarget) {
+        return null;
+      }
     }
+
+    const usePlaceholder = typeof placeholderReplyId === "string" && placeholderReplyId.length > 0;
 
     const aiUser = await ensureAiSupportUser();
     const prompt = buildCreatePrompt(thread);
     const content = await generateAiMarkdown(prompt);
+
+    if (usePlaceholder) {
+      await resolveAiPlaceholderReply({ placeholderReplyId, finalContent: content, failed: !content });
+      return null;
+    }
+
     if (!content) {
       return null;
     }
@@ -252,14 +322,20 @@ export async function createInitialAiReplyForTicket(
     });
   } catch (error) {
     logger.warn("Failed to create initial AI reply", { ticketId, error });
+    const usePlaceholder = typeof placeholderReplyId === "string" && placeholderReplyId.length > 0;
+    if (usePlaceholder) {
+      await resolveAiPlaceholderReply({ placeholderReplyId, finalContent: null, failed: true });
+    }
     return null;
   }
 }
 
 export async function createAiReplyForHumanReply(
   ticketId: string,
-  humanReplyId: string
+  humanReplyId: string,
+  opts?: { placeholderReplyId?: string }
 ): Promise<TicketReplyData | null> {
+  const placeholderReplyId = opts?.placeholderReplyId;
   try {
     const thread = await loadTicketThread(ticketId);
     if (!thread || !thread.aiAutoReplyEnabled || !thread.project || !thread.phase) {
@@ -281,12 +357,24 @@ export async function createAiReplyForHumanReply(
       ),
     });
     if (existingAiReply) {
-      return null;
+      const isSelfPlaceholder = isPlaceholderContent(existingAiReply.content);
+      const isOwnTarget = typeof placeholderReplyId === "string" && existingAiReply.id === placeholderReplyId;
+      if (!isSelfPlaceholder && !isOwnTarget) {
+        return null;
+      }
     }
+
+    const usePlaceholder = typeof placeholderReplyId === "string" && placeholderReplyId.length > 0;
 
     const aiUser = await ensureAiSupportUser();
     const prompt = buildReplyPrompt(thread, targetReply);
     const content = await generateAiMarkdown(prompt);
+
+    if (usePlaceholder) {
+      await resolveAiPlaceholderReply({ placeholderReplyId, finalContent: content, failed: !content });
+      return null;
+    }
+
     if (!content) {
       return null;
     }
@@ -303,6 +391,10 @@ export async function createAiReplyForHumanReply(
       humanReplyId,
       error,
     });
+    const usePlaceholder = typeof placeholderReplyId === "string" && placeholderReplyId.length > 0;
+    if (usePlaceholder) {
+      await resolveAiPlaceholderReply({ placeholderReplyId, finalContent: null, failed: true });
+    }
     return null;
   }
 }
