@@ -1,8 +1,8 @@
 import { APIResponseError } from "./APIResponseError";
 
 export class APIDataNotFoundError extends APIResponseError {
-  constructor() {
-    super("Data not found", 404);
+  constructor(message?: string) {
+    super(message ?? "Data not found", 404);
     this.name = "APIDataNotFoundError";
   }
 }

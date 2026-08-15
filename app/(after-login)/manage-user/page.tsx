@@ -5,6 +5,7 @@ import { Role, Team } from "lib/db/models";
 import HttpGateway from "lib/middlewares/web/HttpGateway";
 import { useEffect, useMemo, useState } from "react";
 import UserTable from "./_components/UserTable";
+import UserFormModal from "./_components/UserFormModal";
 import { CircleX } from "lucide-react";
 import { toast } from "sonner";
 import { useUserLogIn } from "hooks/context/UserLogInContext";
@@ -15,6 +16,7 @@ export default function ManageUserPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [query, setQuery] = useState("");
   const [isLoadingIds, setIsLoadingIds] = useState<Set<string>>(new Set());
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { userLogIn, changeUserLogIn } = useUserLogIn();
 
   // searching user
@@ -34,6 +36,10 @@ export default function ManageUserPage() {
   const getUsers = async () => {
     const { status, data } = await HttpGateway.secureHttpGet("/api/users");
     if (status === 200) setUsers(data.data);
+  };
+
+  const handleUserCreated = async () => {
+    await getUsers();
   };
 
   const getRoles = async () => {
@@ -101,6 +107,7 @@ export default function ManageUserPage() {
       <div className="flex flex-column sm:flex-row flex-wrap space-y-4 sm:space-y-0 items-center justify-between pb-4">
         <button
           type="button"
+          onClick={() => setIsModalOpen(true)}
           className="w-32 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition duration-300 flex items-center justify-center"
         >
           Add User
@@ -144,6 +151,14 @@ export default function ManageUserPage() {
           </div>
         </div>
       </div>
+
+      <UserFormModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        roles={roles}
+        teams={teams}
+        onCreateSuccess={handleUserCreated}
+      />
 
       <UserTable
         users={filteredUsers}
