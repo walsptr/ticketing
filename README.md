@@ -28,8 +28,8 @@ Dokumentasi ini memberikan gambaran umum tentang cara memulai, struktur project,
 Clone repository ini, lalu install dependencies:
 
 ```bash
-git clone -b dev https://github.com/Ticketing-MS/ticketing-ms.git
-cd ticketing-ms/ticketing-dev
+git clone -b dev https://github.com/walsptr/ticketing.git
+cd ticketing
 
 npm install
 ```
