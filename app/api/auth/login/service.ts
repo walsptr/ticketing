@@ -50,8 +50,9 @@ export async function login(
   // check device id
   let deviceId: string | undefined = cookies().get("deviceId")?.value;
   const userAgent: string = req.headers.get("user-agent")?.toString() ?? "";
-  const ipAddress: string =
+  const ipAddressRaw: string =
     req.headers.get("x-forwarded-for")?.toString() ?? "";
+  const ipAddress: string = ipAddressRaw.substring(0, 45); // defensive: IPv6 max length 45, tidak boleh melebihi length DB column
 
   if (deviceId) {
     const authDevice: AuthUser | undefined = await db.query.authUsers.findFirst(

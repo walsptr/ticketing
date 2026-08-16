@@ -11,7 +11,7 @@ export const authUsers = pgTable("auth_users", {
   expiresAt: timestamp("expires_at").notNull(),
   revokedAt: timestamp("revoked_at"),
   userAgent: text("user_agent"),
-  ip: varchar("ip", { length: 20 }),
+  ip: varchar("ip", { length: 45 }),
   deviceId: varchar("device_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

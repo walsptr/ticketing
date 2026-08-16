@@ -32,7 +32,7 @@ CREATE TABLE "auth_users" (
 	"expires_at" timestamp NOT NULL,
 	"revoked_at" timestamp,
 	"user_agent" text,
-	"ip" varchar(20),
+	"ip" varchar(45),
 	"device_id" varchar NOT NULL,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()
